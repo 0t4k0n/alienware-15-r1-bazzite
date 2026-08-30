@@ -1,0 +1,12 @@
+[Unit]
+Description=Provision Alienware S4 hibernation swapfile
+RequiresMountsFor=/var/swap
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/alienware-hibernation-swap-prepare
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

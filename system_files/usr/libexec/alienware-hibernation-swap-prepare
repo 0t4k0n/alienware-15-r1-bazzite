@@ -1,0 +1,50 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+
+readonly swap_directory=/var/swap
+readonly swapfile=/var/swap/hibernation.swap
+readonly swap_size=8G
+
+install -d -m 0700 "${swap_directory}"
+
+filesystem_type="$(findmnt -T "${swap_directory}" -nro FSTYPE)"
+
+if [[ ! -e "${swapfile}" ]]; then
+    if [[ "${filesystem_type}" != btrfs ]]; then
+        printf 'Hibernation swapfile must be created on Btrfs, found: %s\n' \
+            "${filesystem_type:-unknown}" >&2
+        exit 1
+    fi
+    btrfs filesystem mkswapfile --size "${swap_size}" "${swapfile}"
+fi
+
+if [[ ! -f "${swapfile}" ]]; then
+    printf 'Hibernation swap path is not a regular file: %s\n' "${swapfile}" >&2
+    exit 1
+fi
+
+chown root:root "${swapfile}"
+chmod 0600 "${swapfile}"
+restorecon -RF "${swap_directory}"
+
+swap_type="$(blkid --probe --output value --match-tag TYPE "${swapfile}" || true)"
+if [[ "${swap_type}" != swap ]]; then
+    printf 'Hibernation file does not contain a swap signature: %s\n' \
+        "${swapfile}" >&2
+    exit 1
+fi
+
+/usr/libexec/alienware-swapfile-resume-info "${swapfile}" >/dev/null
+
+size_bytes="$(stat --format='%s' "${swapfile}")"
+minimum_size_bytes="$((8 * 1024 * 1024 * 1024))"
+if (( size_bytes < minimum_size_bytes )); then
+    printf 'Hibernation swapfile is too small: %d bytes (minimum %d)\n' \
+        "${size_bytes}" "${minimum_size_bytes}" >&2
+    exit 1
+fi
+
+if ! swapon --show=NAME --noheadings | grep -Fxq "${swapfile}"; then
+    swapon -p -2 "${swapfile}"
+fi

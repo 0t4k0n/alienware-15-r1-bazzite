@@ -16,12 +16,19 @@ fi
 readonly kernel="${kernels[0]}"
 readonly output="/usr/lib/modules/${kernel}/initramfs.img"
 readonly listing="/tmp/alienware-initramfs.list"
+readonly keymap_source="/usr/lib/kbd/keymaps"
+
+if [[ ! -d "${keymap_source}" ]]; then
+    printf 'Console keymap directory is missing: %s\n' "${keymap_source}" >&2
+    exit 1
+fi
 
 dracut --force "${output}" "${kernel}" \
     --hostonly \
     --hostonly-mode strict \
     --no-hostonly-cmdline \
     --hostonly-i18n \
+    --include "${keymap_source}" /usr/lib/kbd/keymaps \
     --strip
 
 lsinitrd "${output}" > "${listing}"
@@ -55,6 +62,7 @@ required_patterns=(
     'systemd-cryptsetup'
     'cryptsetup'
     'it\.map'
+    'us\.map'
 )
 
 for pattern in "${required_patterns[@]}"; do
@@ -63,6 +71,15 @@ for pattern in "${required_patterns[@]}"; do
         exit 1
     fi
 done
+
+readonly source_keymap_count="$(find "${keymap_source}" -type f -name '*.map*' | wc -l)"
+readonly initramfs_keymap_count="$(grep -Ec 'usr/lib/kbd/keymaps/.+\.map(\.(gz|zst))?$' "${listing}")"
+
+if (( source_keymap_count == 0 || initramfs_keymap_count < source_keymap_count )); then
+    printf 'Incomplete console keymap set: initramfs has %d of %d files\n' \
+        "${initramfs_keymap_count}" "${source_keymap_count}" >&2
+    exit 1
+fi
 
 forbidden_patterns=(
     '/nvidia[^/]*\.ko'

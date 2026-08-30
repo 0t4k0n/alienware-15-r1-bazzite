@@ -1,0 +1,30 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+
+readonly swapfile="${1:?Usage: alienware-swapfile-resume-info SWAPFILE}"
+
+filesystem_type="$(findmnt -T "${swapfile}" -nro FSTYPE)"
+resume_source="$(findmnt -T "${swapfile}" -nro SOURCE)"
+resume_block_device="${resume_source%%\[*}"
+resume_device="$(lsblk -dnro MAJ:MIN "${resume_block_device}")"
+
+if [[ "${filesystem_type}" != btrfs ]]; then
+    printf 'Hibernation swapfile must be on Btrfs, found: %s\n' \
+        "${filesystem_type:-unknown}" >&2
+    exit 1
+fi
+
+resume_offset="$(LC_ALL=C btrfs inspect-internal map-swapfile -r "${swapfile}")"
+
+if [[ ! "${resume_device}" =~ ^[1-9][0-9]*:[0-9]+$ ]]; then
+    printf 'Invalid resume device: %s\n' "${resume_device}" >&2
+    exit 1
+fi
+if [[ ! "${resume_offset}" =~ ^[1-9][0-9]*$ ]]; then
+    printf 'Invalid resume offset for %s: %s\n' \
+        "${filesystem_type}" "${resume_offset}" >&2
+    exit 1
+fi
+
+printf '%s %s\n' "${resume_device}" "${resume_offset}"

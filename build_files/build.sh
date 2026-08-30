@@ -10,6 +10,10 @@ readonly VERACRYPT_URL="https://github.com/veracrypt/VeraCrypt/releases/download
 readonly VERACRYPT_SHA256="ff6b9b4a84a546c6a6fbc0c58ac1074fc6252cae8398f52b57ff360a3cbc312e"
 readonly VERACRYPT_KEY_URL="https://amcrypto.jp/VeraCrypt/VeraCrypt_PGP_public_key.asc"
 
+for required_command in blkid btrfs findmnt lsblk restorecon swapon; do
+    command -v "${required_command}" >/dev/null
+done
+
 # Files that are part of the bootable image. Personal Plasma configuration and
 # the custom Kickoff plasmoid deliberately remain in the user's home.
 cp -avf /ctx/system_files/. /
@@ -55,6 +59,7 @@ rm -f "/tmp/${VERACRYPT_RPM}"
 
 # Preserve the service policy already validated on the running machine.
 systemctl enable nordvpnd.service
+systemctl enable alienware-hibernation-swap-prepare.service
 systemctl disable nvidia-persistenced.service || true
 
 # Replace Bazzite's generic initramfs with the deterministic Alienware image.

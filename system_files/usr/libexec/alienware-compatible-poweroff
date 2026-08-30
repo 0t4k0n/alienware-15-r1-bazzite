@@ -4,8 +4,6 @@ set -euo pipefail
 readonly SWAPFILE=/var/swap/hibernation.swap
 RESUME_DEVICE=
 RESUME_OFFSET=
-RESUME_SOURCE=
-RESUME_BLOCK_DEVICE=
 NVIDIA_PREPARED=0
 DISPLAY_STOPPED=0
 PLYMOUTH_STARTED=0
@@ -37,14 +35,11 @@ trap restore_runtime ERR
 
 logger -t alienware-compatible-poweroff 'Avvio spegnimento compatibile tramite ACPI S4'
 
-# Il numero dm-X (e quindi MAJ:MIN) non è stabile tra i boot. findmnt riporta
-# MAJ:MIN=0:* per i bind mount dentro ComposeFS, ma conserva in SOURCE il vero
-# mapper Btrfs. Rimuovere l'eventuale suffisso del subvolume e interrogare il
-# block device con lsblk.
-RESUME_SOURCE=$(findmnt -nro SOURCE /sysroot)
-RESUME_BLOCK_DEVICE=${RESUME_SOURCE%%\[*}
-RESUME_DEVICE=$(lsblk -nro MAJ:MIN "$RESUME_BLOCK_DEVICE")
-RESUME_OFFSET=$(LC_ALL=C btrfs inspect-internal map-swapfile -r "$SWAPFILE")
+# Il numero dm-X e l'offset fisico non sono stabili tra installazioni o layout.
+# L'helper li deriva direttamente dallo swapfile Btrfs.
+read -r RESUME_DEVICE RESUME_OFFSET < <(
+    /usr/libexec/alienware-swapfile-resume-info "$SWAPFILE"
+)
 
 if [[ ! "$RESUME_DEVICE" =~ ^[1-9][0-9]*:[0-9]+$ ]]; then
     logger -t alienware-compatible-poweroff "Dispositivo resume non valido: $RESUME_DEVICE"

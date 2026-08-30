@@ -31,6 +31,19 @@ The image adds:
   systemd service, Polkit rule and application launcher.
 - A disabled `nvidia-persistenced.service`.
 
+The image provisions and activates an 8 GiB swapfile at
+`/var/swap/hibernation.swap` for the compatible power-off backend. The unit is
+idempotent: it creates the persistent file in `/var` only when it is absent,
+then validates its resume offset and minimum size before activation. An
+existing valid file is preserved. The deployment uses `noresume`, so the next
+boot remains a clean boot.
+
+No disk layout, partition, LUKS mapper, filesystem UUID or Btrfs subvolume is
+encoded in the image. At runtime the S4 backend derives the resume block device
+and offset from the swapfile itself. The persistent swap path must be backed by
+Btrfs; other filesystems fail safely instead of using an uncertain resume
+offset.
+
 
 ## Alienware initramfs
 
@@ -44,6 +57,8 @@ The checks require or account for:
 - USB controllers, `usb-storage` and UAS.
 - SATA/AHCI and SCSI disk support.
 - Btrfs, device-mapper, LUKS and systemd-cryptsetup.
+- The complete console-keymap set, without selecting a default layout. The
+  deployment can select its local layout with `vconsole.keymap=`.
 
 The build rejects an initramfs containing:
 
