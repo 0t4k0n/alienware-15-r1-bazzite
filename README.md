@@ -32,8 +32,6 @@ The image adds:
 - Italian virtual-console configuration.
 - A disabled `nvidia-persistenced.service`.
 
-The custom Plasma applet, user preferences, network profiles, LUKS keys and
-personal data are deliberately not part of the image.
 
 ## Alienware initramfs
 
