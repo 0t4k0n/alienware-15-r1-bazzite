@@ -62,5 +62,8 @@ systemctl enable nordvpnd.service
 systemctl enable alienware-hibernation-swap-prepare.service
 systemctl disable nvidia-persistenced.service || true
 
+# Build the hardware contract without inspecting the CI runner.
+/ctx/build-initramfs.sh
+
 dnf5 clean all
 rm -rf /run/dnf

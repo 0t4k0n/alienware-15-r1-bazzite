@@ -14,7 +14,7 @@ encryption must be reviewed before adapting it to another machine.
 
 - Preserve Bazzite's atomic updates and rollback support.
 - Keep Intel as the desktop GPU while retaining NVIDIA render offload.
-- Preserve Bazzite's generic, portable initramfs in the published image.
+- Provide a deterministic, declarative initramfs for this laptop.
 - Include the tested system customizations in the deployment.
 - Keep machine-specific storage and optional initramfs optimization local.
 
@@ -44,19 +44,20 @@ Btrfs; other filesystems fail safely instead of using an uncertain resume
 offset.
 
 
-## Initramfs policy
+## Declarative initramfs
 
-The published image preserves Bazzite's generic initramfs. A strict host-only
-initramfs cannot be generated reliably in GitHub Actions because the runner
-does not have the laptop's storage topology, LUKS metadata, crypttab, removable
-key device or hardware. Machine UUIDs, keyfiles and connection profiles are
-never embedded in the container image.
+The published image builds an initramfs from explicit Dracut-module and
+kernel-driver inventories derived from the known-good 44 MiB initramfs on the
+Alienware 15 R1. Generation uses `--no-hostonly`: the result must not depend on
+the hardware or storage topology of the GitHub Actions runner.
 
-After a successful rebase, this laptop may enable local initramfs regeneration
-with the previously validated Dracut arguments. That optimization belongs to
-the deployment and can incorporate the real host configuration; it is not a
-portable property of the OCI image. NVIDIA remains available after
-switch-root through PRIME/switcheroo offload.
+The contract includes Intel graphics, USB and SATA storage, Btrfs, OSTree,
+device-mapper, LUKS/systemd-cryptsetup, Plymouth and the complete console
+keymap set. Validation rejects NVIDIA, Nouveau and AMDGPU kernel modules as
+well as crypttab, machine identity, connection profiles, keyfiles and private
+keys. Disk and removable-key UUIDs remain deployment-specific kernel
+arguments. NVIDIA remains available after switch-root through
+PRIME/switcheroo offload.
 
 ## Updates
 
@@ -65,12 +66,12 @@ The GitHub Actions workflow:
 - builds and publishes the image on every push to `main`;
 - performs a scheduled build every day;
 - pulls the current Bazzite `stable` base;
-- preserves the initramfs supplied by the current Bazzite `stable` base;
+- builds and validates the declarative initramfs for the current base kernel;
 - publishes `ghcr.io/0t4k0n/alienware-15-r1-bazzite:latest`;
 - signs the published digest with Cosign.
 
-An update is not considered publishable unless the build, bootc lint, registry
-push and signature all succeed.
+An update is not considered publishable unless the build, bootc lint,
+initramfs validation, registry push and signature all succeed.
 
 ## Verification before use
 
