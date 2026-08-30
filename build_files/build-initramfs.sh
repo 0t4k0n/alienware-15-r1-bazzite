@@ -28,10 +28,24 @@ dracut --force "${output}" "${kernel}" \
     --hostonly-mode strict \
     --no-hostonly-cmdline \
     --hostonly-i18n \
+    --add 'btrfs ostree' \
     --include "${keymap_source}" /usr/lib/kbd/keymaps \
     --strip
 
 lsinitrd "${output}" > "${listing}"
+lsinitrd -m "${output}" > "${listing}.modules"
+
+required_dracut_modules=(
+    btrfs
+    ostree
+)
+
+for module in "${required_dracut_modules[@]}"; do
+    if ! grep -Fxq "${module}" "${listing}.modules"; then
+        printf 'Required Dracut module is missing: %s\n' "${module}" >&2
+        exit 1
+    fi
+done
 
 required_drivers=(
     i915
@@ -61,6 +75,8 @@ done
 required_patterns=(
     'systemd-cryptsetup'
     'cryptsetup'
+    'usr/bin/btrfs'
+    'usr/lib/udev/rules.d/64-btrfs-dm.rules'
     'it\.map'
     'us\.map'
 )
@@ -102,4 +118,4 @@ readonly size_bytes="$(stat --format='%s' "${output}")"
 printf 'Validated Alienware initramfs for %s: %.1f MiB\n' \
     "${kernel}" "$(awk -v bytes="${size_bytes}" 'BEGIN { print bytes / 1048576 }')"
 
-rm -f "${listing}"
+rm -f "${listing}" "${listing}.modules"
