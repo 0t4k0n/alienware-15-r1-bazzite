@@ -18,6 +18,13 @@ readonly output="/usr/lib/modules/${kernel}/initramfs.img"
 readonly listing="/tmp/alienware-initramfs.list"
 readonly module_listing="/tmp/alienware-initramfs.modules"
 readonly keymap_source="/usr/lib/kbd/keymaps"
+readonly unpack_dir="$(mktemp -d /tmp/alienware-initramfs.XXXXXX)"
+
+cleanup() {
+    rm -rf "${unpack_dir}"
+    rm -f "${listing}" "${module_listing}"
+}
+trap cleanup EXIT
 
 # This is the Dracut module inventory of the known-good 44 MiB initramfs
 # generated on the Alienware 15 R1. It is intentionally explicit: CI must not
@@ -66,6 +73,7 @@ dracut --force "${output}" "${kernel}" \
 
 lsinitrd "${output}" > "${listing}"
 lsinitrd -m "${output}" > "${module_listing}"
+(cd "${unpack_dir}" && lsinitrd --unpack "${output}")
 
 for module in "${dracut_modules[@]}"; do
     if ! grep -Fxq "${module}" "${module_listing}"; then
@@ -126,8 +134,6 @@ forbidden_patterns=(
     '/amdgpu\.ko'
     '/NetworkManager/system-connections/'
     '(^| )etc/crypttab$'
-    '(^| )etc/machine-id$'
-    '(^| )etc/hostname$'
     '/\.a17c9e4d$'
     'BEGIN .*PRIVATE KEY'
 )
@@ -140,8 +146,25 @@ for pattern in "${forbidden_patterns[@]}"; do
     fi
 done
 
+# Dracut legitimately installs these files even in a generic image. Accept
+# only neutral values; never publish identity copied from a build host.
+if [[ -s "${unpack_dir}/etc/machine-id" ]]; then
+    if [[ "$(< "${unpack_dir}/etc/machine-id")" != "uninitialized" ]]; then
+        printf 'A real machine-id was embedded in the initramfs\n' >&2
+        exit 1
+    fi
+fi
+
+if [[ -s "${unpack_dir}/etc/hostname" ]]; then
+    initramfs_hostname="$(< "${unpack_dir}/etc/hostname")"
+    if [[ "${initramfs_hostname}" != "localhost" && \
+          "${initramfs_hostname}" != "localhost.localdomain" ]]; then
+        printf 'A host-specific hostname was embedded: %s\n' \
+            "${initramfs_hostname}" >&2
+        exit 1
+    fi
+fi
+
 size_bytes="$(stat --format='%s' "${output}")"
 printf 'Validated declarative Alienware initramfs for %s: %.1f MiB\n' \
     "${kernel}" "$(awk -v bytes="${size_bytes}" 'BEGIN { print bytes / 1048576 }')"
-
-rm -f "${listing}" "${module_listing}"
