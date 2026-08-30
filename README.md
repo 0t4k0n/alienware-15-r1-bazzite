@@ -29,7 +29,6 @@ The image adds:
   SHA-256 digest.
 - The ACPI S4 backend used as a compatible power-off action, including its
   systemd service, Polkit rule and application launcher.
-- Italian virtual-console configuration.
 - A disabled `nvidia-persistenced.service`.
 
 
@@ -45,7 +44,6 @@ The checks require or account for:
 - USB controllers, `usb-storage` and UAS.
 - SATA/AHCI and SCSI disk support.
 - Btrfs, device-mapper, LUKS and systemd-cryptsetup.
-- The Italian console keymap.
 
 The build rejects an initramfs containing:
 
