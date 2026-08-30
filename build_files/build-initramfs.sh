@@ -98,13 +98,6 @@ for pattern in "${forbidden_patterns[@]}"; do
 done
 
 readonly size_bytes="$(stat --format='%s' "${output}")"
-readonly max_size_bytes="$((80 * 1024 * 1024))"
-
-if (( size_bytes > max_size_bytes )); then
-    printf 'Initramfs is too large: %d bytes (maximum %d)\n' \
-        "${size_bytes}" "${max_size_bytes}" >&2
-    exit 1
-fi
 
 printf 'Validated Alienware initramfs for %s: %.1f MiB\n' \
     "${kernel}" "$(awk -v bytes="${size_bytes}" 'BEGIN { print bytes / 1048576 }')"

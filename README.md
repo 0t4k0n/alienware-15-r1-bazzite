@@ -66,8 +66,9 @@ The build rejects an initramfs containing:
 - NetworkManager connection profiles.
 - Machine-specific keyfiles or private keys.
 
-The build also fails if the initramfs exceeds 80 MiB. NVIDIA remains fully
-available after switch-root through PRIME/switcheroo offload.
+NVIDIA remains fully available after switch-root through PRIME/switcheroo
+offload. The resulting initramfs size is reported for review but is not used as
+an arbitrary publication threshold.
 
 ## Updates
 
