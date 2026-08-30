@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Compatible Power Off
+Name[it]=Spegnimento compatibile
+Comment=Power off through ACPI S4 without restoring the session
+Comment[it]=Spegne il computer tramite ACPI S4 senza ripristinare la sessione
+Icon=system-shutdown
+Exec=/usr/bin/systemctl --no-block start alienware-compatible-poweroff.service
+Terminal=false
+Categories=System;
+Keywords=power off;shutdown;hibernate;S4;
+Keywords[it]=spegni;arresta;hibernate;ibernazione;S4;
+StartupNotify=false

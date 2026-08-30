@@ -1,0 +1,97 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+readonly SWAPFILE=/var/swap/hibernation.swap
+RESUME_DEVICE=
+RESUME_OFFSET=
+RESUME_SOURCE=
+RESUME_BLOCK_DEVICE=
+NVIDIA_PREPARED=0
+DISPLAY_STOPPED=0
+PLYMOUTH_STARTED=0
+
+exec 9>/run/alienware-compatible-poweroff.lock
+flock -n 9 || exit 0
+
+restore_runtime() {
+    trap - ERR
+    set +e
+    if (( NVIDIA_PREPARED )); then
+        /usr/bin/nvidia-sleep.sh resume || true
+    fi
+    if ! swapon --show=NAME --noheadings | grep -Fxq /dev/zram0; then
+        # swapoff può lasciare /dev/zram0 senza una firma swap riutilizzabile.
+        # Il restart ricrea dispositivo, firma e attivazione secondo la
+        # configurazione di zram-generator.
+        systemctl restart systemd-zram-setup@zram0.service || true
+    fi
+    if (( PLYMOUTH_STARTED )); then
+        /usr/bin/plymouth quit --retain-splash || true
+        systemctl stop plymouth-poweroff.service || true
+    fi
+    if (( DISPLAY_STOPPED )); then
+        systemctl start display-manager.service || true
+    fi
+}
+trap restore_runtime ERR
+
+logger -t alienware-compatible-poweroff 'Avvio spegnimento compatibile tramite ACPI S4'
+
+# Il numero dm-X (e quindi MAJ:MIN) non è stabile tra i boot. findmnt riporta
+# MAJ:MIN=0:* per i bind mount dentro ComposeFS, ma conserva in SOURCE il vero
+# mapper Btrfs. Rimuovere l'eventuale suffisso del subvolume e interrogare il
+# block device con lsblk.
+RESUME_SOURCE=$(findmnt -nro SOURCE /sysroot)
+RESUME_BLOCK_DEVICE=${RESUME_SOURCE%%\[*}
+RESUME_DEVICE=$(lsblk -nro MAJ:MIN "$RESUME_BLOCK_DEVICE")
+RESUME_OFFSET=$(LC_ALL=C btrfs inspect-internal map-swapfile -r "$SWAPFILE")
+
+if [[ ! "$RESUME_DEVICE" =~ ^[1-9][0-9]*:[0-9]+$ ]]; then
+    logger -t alienware-compatible-poweroff "Dispositivo resume non valido: $RESUME_DEVICE"
+    exit 1
+fi
+if [[ ! "$RESUME_OFFSET" =~ ^[1-9][0-9]*$ ]]; then
+    logger -t alienware-compatible-poweroff "Offset resume non valido: $RESUME_OFFSET"
+    exit 1
+fi
+logger -t alienware-compatible-poweroff "Resume dinamico: device=$RESUME_DEVICE offset=$RESUME_OFFSET"
+
+if [[ ${1:-} == --check ]]; then
+    printf 'OK: swapfile=%s device=%s offset=%s\n' "$SWAPFILE" "$RESUME_DEVICE" "$RESUME_OFFSET"
+    exit 0
+fi
+
+# La procedura gira come servizio di sistema: può quindi terminare la sessione
+# grafica senza interrompere se stessa. Plymouth viene avviato solo dopo che il
+# display manager ha rilasciato la console e la GPU.
+systemctl stop display-manager.service
+DISPLAY_STOPPED=1
+systemctl start plymouth-poweroff.service
+PLYMOUTH_STARTED=1
+/usr/bin/plymouth display-message --text='Spegnimento in corso…' || true
+
+# Libera la zram e ricrea la firma dello swapfile, così l'immagine precedente
+# non viene conservata. Al prossimo avvio noresume forza comunque un boot pulito.
+if swapon --show=NAME --noheadings | grep -Fxq /dev/zram0; then
+    swapoff /dev/zram0
+fi
+if swapon --show=NAME --noheadings | grep -Fxq "$SWAPFILE"; then
+    swapoff "$SWAPFILE"
+fi
+swapon -p -2 "$SWAPFILE"
+sync
+
+printf '%s' 0 > /sys/power/image_size
+printf '%s' "$RESUME_DEVICE" > /sys/power/resume
+printf '%s' "$RESUME_OFFSET" > /sys/power/resume_offset
+printf '%s' platform > /sys/power/disk
+
+NVIDIA_PREPARED=1
+/usr/bin/nvidia-sleep.sh hibernate
+logger -t alienware-compatible-poweroff 'Ingresso in ACPI S4'
+printf '%s' disk > /sys/power/state
+
+# Raggiunto soltanto se il firmware restituisce il controllo senza spegnere.
+logger -t alienware-compatible-poweroff 'ACPI S4 ha restituito il controllo inaspettatamente'
+restore_runtime
+exit 1

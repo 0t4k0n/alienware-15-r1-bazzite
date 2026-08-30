@@ -1,27 +1,64 @@
-#!/bin/bash
+#!/usr/bin/bash
 
-set -ouex pipefail
+set -euo pipefail
+set -x
 
-# Copy the contents of system_files/ of the git repo to /
-cp -avf "/ctx/system_files"/. /
+readonly VERACRYPT_VERSION="1.26.29"
+readonly VERACRYPT_RELEASE="Fedora-44"
+readonly VERACRYPT_RPM="veracrypt-${VERACRYPT_VERSION}-${VERACRYPT_RELEASE}-x86_64.rpm"
+readonly VERACRYPT_URL="https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_${VERACRYPT_VERSION}/${VERACRYPT_RPM}"
+readonly VERACRYPT_SHA256="ff6b9b4a84a546c6a6fbc0c58ac1074fc6252cae8398f52b57ff360a3cbc312e"
+readonly VERACRYPT_KEY_URL="https://amcrypto.jp/VeraCrypt/VeraCrypt_PGP_public_key.asc"
 
-### Install packages
+# Files that are part of the bootable image. Personal Plasma configuration and
+# the custom Kickoff plasmoid deliberately remain in the user's home.
+cp -avf /ctx/system_files/. /
 
-# Packages can be installed from any enabled yum repo on the image.
-# RPMfusion repos are available by default in ublue main images
-# List of rpmfusion packages can be found here:
-# https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/43/x86_64/repoview/index.html&protocol=https&redirect=1
+# NordVPN and ChatGPT are installed from their signed upstream repositories.
+# Every scheduled build resolves their current package versions.
+dnf5 install -y \
+    nordvpn \
+    chatgpt
 
-# this installs a package from fedora repos
-dnf5 install -y tmux
+# The upstream GUI RPM installs its application payload below /opt. In bootc
+# images /opt is a symlink to the persistent /var/opt, which RPM deliberately
+# refuses to traverse and which would not be versioned with the deployment.
+# Install with a temporary real /opt, then relocate the self-contained Flutter
+# bundle into immutable /usr and point the packaged launcher at its new home.
+test "$(readlink /opt)" = "var/opt"
+unlink /opt
+mkdir /opt
+dnf5 install -y nordvpn-gui
+mv /opt/nordvpn-gui /usr/lib/nordvpn-gui
+rmdir /opt
+ln -s var/opt /opt
+ln -sfn /usr/lib/nordvpn-gui/nordvpn-gui /usr/sbin/nordvpn-gui
 
-# Use a COPR Example:
-#
-# dnf5 -y copr enable ublue-os/staging
-# dnf5 -y install package
-# Disable COPRs so they don't end up enabled on the final image:
-# dnf5 -y copr disable ublue-os/staging
+# Seed NordVPN's mutable database on first boot without shipping regular files
+# directly in /var, which is persistent state outside the image deployment.
+if [[ -d /var/lib/nordvpn/data ]]; then
+    mkdir -p /usr/share/nordvpn
+    mv /var/lib/nordvpn/data /usr/share/nordvpn/data
+fi
 
-#### Example for enabling a System Unit File
+# VeraCrypt does not publish a Fedora repository. Pin the official RPM and
+# verify both its digest and embedded RPM signature.
+curl --fail --location --retry 3 \
+    --output "/tmp/${VERACRYPT_RPM}" \
+    "${VERACRYPT_URL}"
+printf '%s  %s\n' "${VERACRYPT_SHA256}" "/tmp/${VERACRYPT_RPM}" | \
+    sha256sum --check --strict
+rpm --import "${VERACRYPT_KEY_URL}"
+rpm --checksig "/tmp/${VERACRYPT_RPM}" | grep -q 'digests signatures OK'
+dnf5 install -y "/tmp/${VERACRYPT_RPM}"
+rm -f "/tmp/${VERACRYPT_RPM}"
 
-systemctl enable podman.socket
+# Preserve the service policy already validated on the running machine.
+systemctl enable nordvpnd.service
+systemctl disable nvidia-persistenced.service || true
+
+# Replace Bazzite's generic initramfs with the deterministic Alienware image.
+/ctx/build-initramfs.sh
+
+dnf5 clean all
+rm -rf /run/dnf

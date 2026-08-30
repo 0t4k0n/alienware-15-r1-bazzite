@@ -1,0 +1,12 @@
+// Consente soltanto all'utente locale otakon di avviare, senza password,
+// l'unita di sistema dello spegnimento ACPI S4 alternativo.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "alienware-compatible-poweroff.service" &&
+        action.lookup("verb") == "start" &&
+        subject.user == "otakon" &&
+        subject.local &&
+        subject.active) {
+        return polkit.Result.YES;
+    }
+});
