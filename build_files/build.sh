@@ -62,8 +62,5 @@ systemctl enable nordvpnd.service
 systemctl enable alienware-hibernation-swap-prepare.service
 systemctl disable nvidia-persistenced.service || true
 
-# Replace Bazzite's generic initramfs with the deterministic Alienware image.
-/ctx/build-initramfs.sh
-
 dnf5 clean all
 rm -rf /run/dnf

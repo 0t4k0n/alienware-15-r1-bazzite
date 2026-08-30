@@ -7,17 +7,16 @@ and an NVIDIA GeForce GTX 970M.
 
 This repository is not an official Bazzite or Universal Blue product, and the
 image is not intended to be a generic build for arbitrary computers. It is
-published as a hardware-specific example and template. Drivers, storage,
-encryption and initramfs checks must be reviewed before adapting it to another
-machine.
+published as a hardware-specific example and template. Drivers, storage and
+encryption must be reviewed before adapting it to another machine.
 
 ## Goals
 
 - Preserve Bazzite's atomic updates and rollback support.
 - Keep Intel as the desktop GPU while retaining NVIDIA render offload.
-- Provide a small, deterministic initramfs for this laptop.
+- Preserve Bazzite's generic, portable initramfs in the published image.
 - Include the tested system customizations in the deployment.
-- Avoid RPM overlays and local initramfs regeneration after each update.
+- Keep machine-specific storage and optional initramfs optimization local.
 
 ## Image customizations
 
@@ -45,30 +44,19 @@ Btrfs; other filesystems fail safely instead of using an uncertain resume
 offset.
 
 
-## Alienware initramfs
+## Initramfs policy
 
-Every build generates an initramfs for this model. Dracut uses strict host-only
-generation, while the hardware and storage stack required by the laptop is
-explicitly forced and the resulting image is validated before publication.
+The published image preserves Bazzite's generic initramfs. A strict host-only
+initramfs cannot be generated reliably in GitHub Actions because the runner
+does not have the laptop's storage topology, LUKS metadata, crypttab, removable
+key device or hardware. Machine UUIDs, keyfiles and connection profiles are
+never embedded in the container image.
 
-The checks require or account for:
-
-- Intel `i915`.
-- USB controllers, `usb-storage` and UAS.
-- SATA/AHCI and SCSI disk support.
-- Btrfs, device-mapper, LUKS and systemd-cryptsetup.
-- The complete console-keymap set, without selecting a default layout. The
-  deployment can select its local layout with `vconsole.keymap=`.
-
-The build rejects an initramfs containing:
-
-- NVIDIA, Nouveau or AMDGPU kernel modules.
-- NetworkManager connection profiles.
-- Machine-specific keyfiles or private keys.
-
-NVIDIA remains fully available after switch-root through PRIME/switcheroo
-offload. The resulting initramfs size is reported for review but is not used as
-an arbitrary publication threshold.
+After a successful rebase, this laptop may enable local initramfs regeneration
+with the previously validated Dracut arguments. That optimization belongs to
+the deployment and can incorporate the real host configuration; it is not a
+portable property of the OCI image. NVIDIA remains available after
+switch-root through PRIME/switcheroo offload.
 
 ## Updates
 
@@ -77,12 +65,12 @@ The GitHub Actions workflow:
 - builds and publishes the image on every push to `main`;
 - performs a scheduled build every day;
 - pulls the current Bazzite `stable` base;
-- rebuilds and validates the initramfs for the new base kernel;
+- preserves the initramfs supplied by the current Bazzite `stable` base;
 - publishes `ghcr.io/0t4k0n/alienware-15-r1-bazzite:latest`;
 - signs the published digest with Cosign.
 
-An update is not considered publishable unless the build, bootc lint,
-initramfs validation, registry push and signature all succeed.
+An update is not considered publishable unless the build, bootc lint, registry
+push and signature all succeed.
 
 ## Verification before use
 
