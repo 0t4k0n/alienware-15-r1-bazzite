@@ -63,7 +63,6 @@ systemctl stop display-manager.service
 DISPLAY_STOPPED=1
 systemctl start plymouth-poweroff.service
 PLYMOUTH_STARTED=1
-/usr/bin/plymouth display-message --text='Spegnimento in corso…' || true
 
 # Libera la zram e ricrea la firma dello swapfile, così l'immagine precedente
 # non viene conservata. Al prossimo avvio noresume forza comunque un boot pulito.

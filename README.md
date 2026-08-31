@@ -14,9 +14,8 @@ encryption must be reviewed before adapting it to another machine.
 
 - Preserve Bazzite's atomic updates and rollback support.
 - Keep Intel as the desktop GPU while retaining NVIDIA render offload.
-- Provide a deterministic, declarative initramfs for this laptop.
+- Provide a reduced, declarative initramfs for this laptop.
 - Include the tested system customizations in the deployment.
-- Keep machine-specific storage and optional initramfs optimization local.
 
 ## Image customizations
 
@@ -26,38 +25,27 @@ The image adds:
 - ChatGPT for Linux.
 - VeraCrypt, downloaded from its official release with a pinned version and
   SHA-256 digest.
-- The ACPI S4 backend used as a compatible power-off action, including its
-  systemd service, Polkit rule and application launcher.
+- A system-wide ACPI S4 power-off workaround for the Alienware firmware/EC
+  shutdown bug.
 - A disabled `nvidia-persistenced.service`.
 
-The image provisions and activates an 8 GiB swapfile at
-`/var/swap/hibernation.swap` for the compatible power-off backend. The unit is
-idempotent: it creates the persistent file in `/var` only when it is absent,
-then validates its resume offset and minimum size before activation. An
-existing valid file is preserved. The deployment uses `noresume`, so the next
-boot remains a clean boot.
-
-No disk layout, partition, LUKS mapper, filesystem UUID or Btrfs subvolume is
-encoded in the image. At runtime the S4 backend derives the resume block device
-and offset from the swapfile itself. The persistent swap path must be backed by
-Btrfs; other filesystems fail safely instead of using an uncertain resume
-offset.
+This model can fail to complete a conventional ACPI poweroff because of a
+firmware/Embedded Controller issue also observable under Windows, where Fast
+Startup normally avoids the affected full-shutdown path. The image works
+around it by replacing the normal system poweroff backend with a custom,
+disposable S4 transition. It writes only the state required to reach S4 and
+uses `noresume`, so the next power-on is always a clean boot. The replacement
+is system-wide: Plasma, SDDM, logind and ordinary command-line poweroff requests
+all follow the same reliable path, while reboot and suspend remain unchanged.
 
 
 ## Declarative initramfs
 
-The published image builds an initramfs from explicit Dracut-module and
-kernel-driver inventories derived from the known-good 44 MiB initramfs on the
-Alienware 15 R1. Generation uses `--no-hostonly`: the result must not depend on
-the hardware or storage topology of the GitHub Actions runner.
-
-The contract includes Intel graphics, USB and SATA storage, Btrfs, OSTree,
-device-mapper, LUKS/systemd-cryptsetup, Plymouth and the complete console
-keymap set. Validation rejects NVIDIA, Nouveau and AMDGPU kernel modules as
-well as crypttab, machine identity, connection profiles, keyfiles and private
-keys. Disk and removable-key UUIDs remain deployment-specific kernel
-arguments. NVIDIA remains available after switch-root through
-PRIME/switcheroo offload.
+The published image includes a reduced, declarative initramfs tailored to the
+Alienware 15 R1 boot hardware. It contains the required Intel graphics,
+storage, Btrfs, OSTree, LUKS and Plymouth support without depending on the
+GitHub Actions runner or embedding machine-specific storage identifiers and
+keys. NVIDIA remains available after switch-root through PRIME render offload.
 
 ## Updates
 

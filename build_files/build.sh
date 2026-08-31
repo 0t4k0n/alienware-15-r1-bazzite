@@ -14,8 +14,8 @@ for required_command in blkid btrfs findmnt lsblk restorecon swapon; do
     command -v "${required_command}" >/dev/null
 done
 
-# Files that are part of the bootable image. Personal Plasma configuration and
-# the custom Kickoff plasmoid deliberately remain in the user's home.
+# Files that are part of the bootable image. Personal Plasma configuration is
+# deliberately left in the user's home.
 cp -avf /ctx/system_files/. /
 
 # NordVPN and ChatGPT are installed from their signed upstream repositories.
@@ -61,6 +61,18 @@ rm -f "/tmp/${VERACRYPT_RPM}"
 systemctl enable nordvpnd.service
 systemctl enable alienware-hibernation-swap-prepare.service
 systemctl disable nvidia-persistenced.service || true
+
+# On this firmware a conventional ACPI poweroff is not reliable. Replace only
+# systemd's normal poweroff backend with the validated disposable-S4 path;
+# reboot, suspend and emergency forced poweroff remain untouched. Bazzite's
+# Plymouth wants must not start concurrently, because the backend starts the
+# splash itself after the display manager has released the console and GPU.
+install -m 0644 \
+    /ctx/system_files/usr/lib/systemd/system/systemd-poweroff.service \
+    /usr/lib/systemd/system/systemd-poweroff.service
+rm -f \
+    /usr/lib/systemd/system/poweroff.target.wants/plymouth-poweroff.service \
+    /usr/lib/systemd/system/poweroff.target.wants/plymouth-switch-root-initramfs.service
 
 # Build the hardware contract without inspecting the CI runner.
 /ctx/build-initramfs.sh
