@@ -48,14 +48,14 @@ kernel_drivers=(
     cast6_generic cast_common cec chacha chacha20poly1305 crc32-cryptoapi
     crypto_engine crypto_user des_generic dm-crypt drm_buddy
     drm_display_helper echainiv ecrdsa_generic erofs essiv fcrypt ff-memless
-    fuse gcadapter_oc hctr2 hid-fanatec hid-logitech-new hid-tmff-new hkdf
+    fuse hctr2 hkdf
     i2c-algo-bit i2c-dev i915 iTCO_wdt intel_oc_wdt intel_pmc_bxt krb5
-    krb5enc kvmfr libdes lz4 lz4_compress lz4hc lz4hc_compress mc md4
-    michael_mic nct6687 nhpoly1305 ntsync overlay padlock-aes pcbc pcrypt
-    pkcs8_key_parser polyval-generic raid6test rmd160 ryzen_smu serio_raw
-    serpent_generic streebog_generic system76 system76-io system76-thelio-io
-    tcrypt ttm twofish_common twofish_generic uas uhid usb-storage
-    v4l2loopback video videodev wmi wp512 xcbc xctr zstd
+    krb5enc libdes lz4 lz4_compress lz4hc lz4hc_compress mc md4
+    michael_mic nhpoly1305 overlay padlock-aes pcbc pcrypt
+    pkcs8_key_parser polyval-generic rmd160 serio_raw
+    serpent_generic streebog_generic
+    ttm twofish_common twofish_generic uas uhid usb-storage
+    video videodev wmi wp512 xcbc xctr zstd
 )
 
 if [[ ! -d "${keymap_source}" ]]; then

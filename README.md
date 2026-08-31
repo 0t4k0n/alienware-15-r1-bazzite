@@ -21,10 +21,6 @@ encryption must be reviewed before adapting it to another machine.
 
 The image adds:
 
-- NordVPN CLI and GUI, with `nordvpnd.service` enabled.
-- ChatGPT for Linux.
-- VeraCrypt, downloaded from its official release with a pinned version and
-  SHA-256 digest.
 - A system-wide ACPI S4 power-off workaround for the Alienware firmware/EC
   shutdown bug.
 - A disabled `nvidia-persistenced.service`.
