@@ -171,6 +171,13 @@ ostree-rechunk $target_image=image_name $tag=default_tag:
     # Use the already-built local image to avoid pulling from a remote registry
     RPM_OSTREE_CHUNKER_IMAGE="localhost/${target_image}:${tag}"
 
+    # Preserve the Bazzite stable build version after rpm-ostree rechunking.
+    # IMAGE_ID is inherited from the selected Bazzite base image.
+    UPSTREAM_VERSION="$(podman run --rm --entrypoint /usr/bin/bash \
+      "${RPM_OSTREE_CHUNKER_IMAGE}" -c \
+      'source /usr/lib/os-release; printf "%s\n" "${IMAGE_ID##*-}"')"
+    [[ "${UPSTREAM_VERSION}" =~ ^[0-9]+\.[0-9]{8}$ ]]
+
     GRAPHROOT="$(podman info --format '{{ '{{.Store.GraphRoot}}' }}')"
 
     podman run --rm --pull=never --privileged \
@@ -183,6 +190,7 @@ ostree-rechunk $target_image=image_name $tag=default_tag:
       --max-layers 127 \
       --format-version=2 \
       --bootc \
+      --label "org.opencontainers.image.version=${UPSTREAM_VERSION}" \
       --rootfs /rpm-ostree \
       --output "containers-storage:[overlay@/run/host-container-storage+/run/rpm-ostree-storage]localhost/${target_image}:${tag}"
 

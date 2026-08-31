@@ -37,6 +37,9 @@ disposable S4 transition. It writes only the state required to reach S4 and
 uses `noresume`, so the next power-on is always a clean boot. The replacement
 is system-wide: Plasma, SDDM, logind and ordinary command-line poweroff requests
 all follow the same reliable path, while reboot and suspend remain unchanged.
+`noresume` is a deployment kernel-argument requirement rather than an image
+default; the backend checks it before touching the running session and fails
+safely when it is absent.
 
 
 ## Declarative initramfs
@@ -54,9 +57,14 @@ The GitHub Actions workflow:
 - builds and publishes the image on every push to `main`;
 - performs a scheduled build every day;
 - pulls the current Bazzite `stable` base;
+- preserves the corresponding Bazzite build version in the derived image;
 - builds and validates the declarative initramfs for the current base kernel;
 - publishes `ghcr.io/0t4k0n/alienware-15-r1-bazzite:latest`;
 - signs the published digest with Cosign.
+
+The image installs its public signing key and a scoped containers policy so
+that deployments can follow the signed image reference after the initial
+explicit bootstrap.
 
 An update is not considered publishable unless the build, bootc lint,
 initramfs validation, registry push and signature all succeed.

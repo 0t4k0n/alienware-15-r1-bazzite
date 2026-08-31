@@ -11,6 +11,15 @@ PLYMOUTH_STARTED=0
 exec 9>/run/alienware-compatible-poweroff.lock
 flock -n 9 || exit 0
 
+# Disposable S4 is safe only when the next boot is explicitly forbidden from
+# resuming the image that this operation writes.
+if ! grep -qw -- noresume /proc/cmdline; then
+    logger -t alienware-compatible-poweroff \
+        'Rifiuto S4 usa-e-getta: parametro kernel noresume assente'
+    printf 'Refusing disposable S4: kernel argument noresume is missing\n' >&2
+    exit 1
+fi
+
 restore_runtime() {
     trap - ERR
     set +e
