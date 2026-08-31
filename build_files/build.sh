@@ -19,7 +19,7 @@ done
 # its upstream version and stop publication if systemd changes the structural
 # responsibilities on which the reviewed replacement is based. Comments,
 # descriptions and directive ordering do not affect this check.
-systemd --version
+systemctl --version
 sha256sum "${UPSTREAM_POWEROFF_UNIT}"
 sed -n '1,160p' "${UPSTREAM_POWEROFF_UNIT}"
 
