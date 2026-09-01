@@ -58,7 +58,6 @@ readonly -a PHASE_A_REMOVE_PACKAGES=(
     hid-tmff2 hid-tmff2-akmod-modules kmod-hid-tmff2
     kvmfr kmod-kvmfr
     nct6687d kmod-nct6687d
-    new-lg4ff new-lg4ff-akmod-modules kmod-new-lg4ff
     openrazer-kmod-common kmod-openrazer
     ryzen_smu ryzen_smu-akmod-modules kmod-ryzen_smu ryzenadj
     sc0710 kmod-sc0710
@@ -88,12 +87,16 @@ done
 # would otherwise advertise commands or hardware support that no longer exists.
 rm -f \
     /etc/default/waydroid-launcher \
+    /etc/yum.repos.d/tailscale.repo \
     /usr/bin/waydroid-choose-gpu \
     /usr/bin/waydroid-launcher \
     /usr/libexec/waydroid-container-restart \
     /usr/libexec/waydroid-container-start \
     /usr/libexec/waydroid-container-stop \
     /usr/libexec/waydroid-fix-controllers \
+    /usr/lib/systemd/system/cockpit.service \
+    /usr/lib/udev/rules.d/50-framework-inputmodule.rules \
+    /usr/lib/udev/rules.d/50-framework16.rules \
     /usr/share/applications/waydroid-container-restart.desktop \
     /usr/share/fish/completions/waydroid.fish \
     /usr/share/polkit-1/actions/org.bazzite.waydroid.policy \
@@ -106,6 +109,7 @@ rm -rf \
     /usr/lib/waydroid \
     /usr/share/applications/Waydroid
 for removed_path in \
+    /etc/yum.repos.d/tailscale.repo \
     /usr/bin/waydroid-choose-gpu \
     /usr/bin/waydroid-launcher \
     /usr/lib/waydroid \
@@ -113,12 +117,15 @@ for removed_path in \
     /usr/libexec/waydroid-container-start \
     /usr/libexec/waydroid-container-stop \
     /usr/libexec/waydroid-fix-controllers \
+    /usr/lib/systemd/system/cockpit.service \
+    /usr/lib/udev/rules.d/50-framework-inputmodule.rules \
+    /usr/lib/udev/rules.d/50-framework16.rules \
     /usr/share/applications/Waydroid \
     /usr/share/applications/waydroid-container-restart.desktop \
     /usr/share/polkit-1/actions/org.bazzite.waydroid.policy \
     /usr/share/polkit-1/rules.d/30-waydroid.rules; do
     if [[ -e "${removed_path}" ]]; then
-        printf 'Waydroid integration unexpectedly remains: %s\n' \
+        printf 'Removed integration unexpectedly remains: %s\n' \
             "${removed_path}" >&2
         exit 1
     fi
@@ -128,7 +135,9 @@ done
 # stack are used on this machine. Xone and v4l2loopback also remain available.
 for required_package in \
     gcadapter_oc kmod-gcadapter_oc xwiimote-ng \
-    xone-kmod-common kmod-xone v4l2loopback kmod-v4l2loopback; do
+    xone-kmod-common kmod-xone v4l2loopback kmod-v4l2loopback \
+    new-lg4ff new-lg4ff-akmod-modules kmod-new-lg4ff oversteer-udev \
+    gmodpatchtool linux-cec inputattach-cec-units; do
     rpm --quiet -q "${required_package}"
 done
 
@@ -210,6 +219,9 @@ readonly -a PHASE_C_REMOVE_PACKAGES=(
     brltty orca espeak-ng
     speech-dispatcher speech-dispatcher-espeak-ng
     speech-dispatcher-libs speech-dispatcher-utils
+
+    # Optional Mint web-app wrapper; browsers and Flatpak remain available.
+    webapp-manager
 )
 
 phase_c_installed=()
