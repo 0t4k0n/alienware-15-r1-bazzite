@@ -101,6 +101,57 @@ for required_package in \
     rpm --quiet -q "${required_package}"
 done
 
+# Phase B: remove optional features that are not used by this installation.
+# Keep Podman and Toolbox (including the persistent alienfx-dev toolbox), but
+# remove the alternative Distrobox frontend. NVIDIA graphics, PRIME and the
+# complete Steam/Proton 32-bit graphics ABI remain intact; only the independent
+# 32-bit CUDA/FBC compute payload is removed.
+readonly -a PHASE_B_REMOVE_PACKAGES=(
+    tailscale
+    libnvidia-container-tools libnvidia-container1
+    nvidia-container-toolkit nvidia-container-toolkit-base
+    krdc krdc-libs
+    distrobox
+    nvidia-driver-cuda-libs.i686 libnvidia-fbc.i686
+)
+
+phase_b_installed=()
+for package in "${PHASE_B_REMOVE_PACKAGES[@]}"; do
+    if rpm --quiet -q "${package}"; then
+        phase_b_installed+=("${package}")
+    fi
+done
+if ((${#phase_b_installed[@]})); then
+    dnf5 remove -y "${phase_b_installed[@]}"
+fi
+for package in "${PHASE_B_REMOVE_PACKAGES[@]}"; do
+    if rpm --quiet -q "${package}"; then
+        printf 'Phase B package unexpectedly remains installed: %s\n' \
+            "${package}" >&2
+        exit 1
+    fi
+done
+
+# Remove Bazzite integrations that would otherwise advertise the removed
+# Distrobox frontend. The Toolbox container storage under /var is persistent
+# host state and is neither removed nor modified by the image build.
+rm -rf /etc/distrobox
+rm -f /usr/share/ublue-os/just/30-distrobox.just
+
+# Fail publication if the cleanup ever expands into retained storage, editor,
+# container or NVIDIA functionality. nvidia-smi belongs to the native
+# nvidia-driver-cuda package, which therefore intentionally remains installed.
+for required_package in \
+    podman toolbox \
+    snapper snapper-libs btrfs-assistant \
+    kate kate-libs kate-plugins \
+    nvidia-driver nvidia-driver-cuda nvidia-driver-cuda-libs.x86_64 \
+    nvidia-driver-libs.x86_64 nvidia-driver-libs.i686; do
+    rpm --quiet -q "${required_package}"
+done
+command -v nvidia-smi >/dev/null
+rpm --quiet -qf "$(command -v nvidia-smi)"
+
 # Trust updates from this repository only when their Sigstore signature matches
 # the public key shipped with the image. The first installation remains an
 # explicit bootstrap decision; subsequent signed deployments use this policy.
