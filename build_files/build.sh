@@ -152,6 +152,71 @@ done
 command -v nvidia-smi >/dev/null
 rpm --quiet -qf "$(command -v nvidia-smi)"
 
+# Phase C: remove complete optional stacks that have no role on this physical,
+# Italian/English workstation. Core IBus remains for ordinary desktop input;
+# only the broad CJK/Thai/Sinhala/Vietnamese engines and the unused Fcitx
+# alternative are removed. OpenCL remains intact for now, including its Intel,
+# Mesa and NVIDIA providers and KInfoCenter integration.
+readonly -a PHASE_C_REMOVE_PACKAGES=(
+    # Firmware/emulation for local VMs, guest operation and cross-architecture
+    # containers. None is required to boot this physical x86_64 machine.
+    edk2-ovmf qemu-guest-agent qemu-user-static-aarch64
+
+    # Fcitx and non-Latin input engines/data not used by this installation.
+    fcitx5 fcitx5-chewing fcitx5-chinese-addons
+    fcitx5-chinese-addons-data fcitx5-configtool fcitx5-data
+    fcitx5-gtk fcitx5-gtk3 fcitx5-gtk4 fcitx5-hangul fcitx5-libs
+    fcitx5-libthai fcitx5-lua fcitx5-m17n fcitx5-mozc
+    fcitx5-qt fcitx5-qt-libfcitx5qt6widgets
+    fcitx5-qt-libfcitx5qtdbus fcitx5-qt-qt6gui fcitx5-qt5 fcitx5-qt6
+    fcitx5-sayura fcitx5-table-extra fcitx5-unikey
+    ibus-anthy ibus-anthy-python ibus-chewing ibus-hangul
+    ibus-libpinyin ibus-m17n ibus-typing-booster
+    anthy-unicode kasumi-common kasumi-unicode libpinyin libpinyin-data
+
+    # Screen reader, Braille and speech-dispatch services are not used. The
+    # general Qt Speech libraries and the normal PipeWire audio stack remain.
+    brltty orca espeak-ng
+    speech-dispatcher speech-dispatcher-espeak-ng
+    speech-dispatcher-libs speech-dispatcher-utils
+)
+
+phase_c_installed=()
+for package in "${PHASE_C_REMOVE_PACKAGES[@]}"; do
+    if rpm --quiet -q "${package}"; then
+        phase_c_installed+=("${package}")
+    fi
+done
+if ((${#phase_c_installed[@]})); then
+    dnf5 remove -y "${phase_c_installed[@]}"
+fi
+for package in "${PHASE_C_REMOVE_PACKAGES[@]}"; do
+    if rpm --quiet -q "${package}"; then
+        printf 'Phase C package unexpectedly remains installed: %s\n' \
+            "${package}" >&2
+        exit 1
+    fi
+done
+
+# Preserve the normal Plasma/input path and the system-information application.
+for required_package in \
+    ibus ibus-libs ibus-gtk3 ibus-gtk4 \
+    breeze-icon-theme oxygen-cursor-themes oxygen-icon-theme oxygen-sounds \
+    plasma-oxygen plasma-oxygen-qt5 plasma-oxygen-qt6 \
+    kinfocenter clinfo opencl-filesystem \
+    intel-opencl intel-opencl-clang mesa-libOpenCL \
+    nvidia-driver-cuda-libs.x86_64 \
+    akonadi-server akonadi-server-mysql mariadb-server \
+    cups cups-client cups-filters cups-filters-driverless \
+    sane-airscan sane-backends \
+    samba samba-client cifs-utils nfs-utils openssh-server \
+    bees f2fs-tools xfsprogs udftools \
+    jupiter-sd-mounting-btrfs steamdeck-kde-presets-desktop \
+    xone-kmod-common kmod-xone v4l2loopback kmod-v4l2loopback; do
+    rpm --quiet -q "${required_package}"
+done
+command -v clinfo >/dev/null
+
 # Trust updates from this repository only when their Sigstore signature matches
 # the public key shipped with the image. The first installation remains an
 # explicit bootstrap decision; subsequent signed deployments use this policy.
