@@ -269,20 +269,6 @@ readonly -a PHASE_D_REMOVE_PACKAGES=(
     # and the rest of the multimedia stack remain available.
     makemkv
 
-    # OCR engine, development files, documentation and every language model
-    # currently delivered by Bazzite. Font, locale and spell-checking packages
-    # are independent and remain untouched.
-    tesseract-common tesseract-libs tesseract-devel tesseract-tessdata-doc
-    tesseract-langpack-eng tesseract-langpack-tur
-    tesseract-langpack-spa tesseract-langpack-rus
-    tesseract-langpack-por tesseract-langpack-pol
-    tesseract-langpack-nld tesseract-langpack-jpn_vert
-    tesseract-langpack-jpn tesseract-langpack-ita
-    tesseract-langpack-fra tesseract-langpack-ell
-    tesseract-langpack-deu tesseract-langpack-chi_tra_vert
-    tesseract-langpack-chi_tra tesseract-langpack-chi_sim_vert
-    tesseract-langpack-chi_sim tesseract-langpack-ces
-
     # Guest agents for hypervisors that this hardware does not run under.
     hyperv-daemons hyperv-daemons-license hypervfcopyd hypervkvpd hypervvssd
     open-vm-tools open-vm-tools-desktop
@@ -306,10 +292,21 @@ for package in "${PHASE_D_REMOVE_PACKAGES[@]}"; do
     fi
 done
 
-# Diagnostic and shared runtime facilities are deliberately outside the guest
-# cleanup and must survive any dependency changes in the base image.
-for required_package in kernel pciutils xmlsec1-openssl; do
+# Diagnostic, desktop and multimedia facilities are deliberately outside the
+# cleanup and must survive any dependency changes in the base image. Fedora's
+# FFmpeg build requires Tesseract's shared library; removing or orphaning the
+# OCR stack cascades through FFmpeg into Plasma Workspace and is forbidden.
+for required_package in \
+    kernel pciutils xmlsec1-openssl \
+    tesseract-common tesseract-libs tesseract-devel \
+    ffmpeg ffmpeg-libs plasma-desktop plasma-workspace spectacle; do
     rpm --quiet -q "${required_package}"
+done
+for required_qml_module in \
+    /usr/lib64/qt6/qml/org/kde/plasma/private/keyboardindicator/qmldir \
+    /usr/lib64/qt6/qml/org/kde/breeze/components/qmldir; do
+    test -f "${required_qml_module}"
+    rpm --quiet -qf "${required_qml_module}"
 done
 
 # Phase E: kernel modules are compiled by Universal Blue's server-side akmods
