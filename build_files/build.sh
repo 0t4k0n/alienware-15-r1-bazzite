@@ -260,6 +260,58 @@ for required_package in \
 done
 command -v clinfo >/dev/null
 
+# Phase D: remove self-contained applications and guest integrations that have
+# no role on this physical workstation. Keep shared multimedia/image libraries,
+# pciutils and generic virtualization support: only the explicit leaf stacks
+# are removed here, so an upstream dependency change remains visible to DNF.
+readonly -a PHASE_D_REMOVE_PACKAGES=(
+    # Optical-disc ripping application; normal DVD/Blu-ray playback libraries
+    # and the rest of the multimedia stack remain available.
+    makemkv
+
+    # OCR engine, development files, documentation and every language model
+    # currently delivered by Bazzite. Font, locale and spell-checking packages
+    # are independent and remain untouched.
+    tesseract-common tesseract-libs tesseract-devel tesseract-tessdata-doc
+    tesseract-langpack-eng tesseract-langpack-tur
+    tesseract-langpack-spa tesseract-langpack-rus
+    tesseract-langpack-por tesseract-langpack-pol
+    tesseract-langpack-nld tesseract-langpack-jpn_vert
+    tesseract-langpack-jpn tesseract-langpack-ita
+    tesseract-langpack-fra tesseract-langpack-ell
+    tesseract-langpack-deu tesseract-langpack-chi_tra_vert
+    tesseract-langpack-chi_tra tesseract-langpack-chi_sim_vert
+    tesseract-langpack-chi_sim tesseract-langpack-ces
+
+    # Guest agents for hypervisors that this hardware does not run under.
+    hyperv-daemons hyperv-daemons-license hypervfcopyd hypervkvpd hypervvssd
+    open-vm-tools open-vm-tools-desktop
+    virtualbox-guest-additions
+)
+
+phase_d_installed=()
+for package in "${PHASE_D_REMOVE_PACKAGES[@]}"; do
+    if rpm --quiet -q "${package}"; then
+        phase_d_installed+=("${package}")
+    fi
+done
+if ((${#phase_d_installed[@]})); then
+    dnf5 remove -y "${phase_d_installed[@]}"
+fi
+for package in "${PHASE_D_REMOVE_PACKAGES[@]}"; do
+    if rpm --quiet -q "${package}"; then
+        printf 'Phase D package unexpectedly remains installed: %s\n' \
+            "${package}" >&2
+        exit 1
+    fi
+done
+
+# Diagnostic and shared runtime facilities are deliberately outside the guest
+# cleanup and must survive any dependency changes in the base image.
+for required_package in kernel pciutils xmlsec1-openssl; do
+    rpm --quiet -q "${required_package}"
+done
+
 # Trust updates from this repository only when their Sigstore signature matches
 # the public key shipped with the image. The first installation remains an
 # explicit bootstrap decision; subsequent signed deployments use this policy.
