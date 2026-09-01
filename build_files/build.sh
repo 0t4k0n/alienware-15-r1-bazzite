@@ -88,10 +88,41 @@ done
 # would otherwise advertise commands or hardware support that no longer exists.
 rm -f \
     /etc/default/waydroid-launcher \
+    /usr/bin/waydroid-choose-gpu \
+    /usr/bin/waydroid-launcher \
+    /usr/libexec/waydroid-container-restart \
+    /usr/libexec/waydroid-container-start \
+    /usr/libexec/waydroid-container-stop \
+    /usr/libexec/waydroid-fix-controllers \
+    /usr/share/applications/waydroid-container-restart.desktop \
+    /usr/share/fish/completions/waydroid.fish \
+    /usr/share/polkit-1/actions/org.bazzite.waydroid.policy \
+    /usr/share/polkit-1/rules.d/30-waydroid.rules \
     /usr/share/ublue-os/just/82-bazzite-cockpit.just \
     /usr/share/ublue-os/just/82-bazzite-waydroid.just \
     /usr/share/ublue-os/udev-rules/50-framework-inputmodule.rules \
     /usr/share/ublue-os/udev-rules/50-framework16.rules
+rm -rf \
+    /usr/lib/waydroid \
+    /usr/share/applications/Waydroid
+for removed_path in \
+    /usr/bin/waydroid-choose-gpu \
+    /usr/bin/waydroid-launcher \
+    /usr/lib/waydroid \
+    /usr/libexec/waydroid-container-restart \
+    /usr/libexec/waydroid-container-start \
+    /usr/libexec/waydroid-container-stop \
+    /usr/libexec/waydroid-fix-controllers \
+    /usr/share/applications/Waydroid \
+    /usr/share/applications/waydroid-container-restart.desktop \
+    /usr/share/polkit-1/actions/org.bazzite.waydroid.policy \
+    /usr/share/polkit-1/rules.d/30-waydroid.rules; do
+    if [[ -e "${removed_path}" ]]; then
+        printf 'Waydroid integration unexpectedly remains: %s\n' \
+            "${removed_path}" >&2
+        exit 1
+    fi
+done
 
 # Controller support intentionally retained: the GameCube adapter and Wii
 # stack are used on this machine. Xone and v4l2loopback also remain available.
