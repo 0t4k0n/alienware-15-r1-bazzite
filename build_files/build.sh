@@ -312,6 +312,42 @@ for required_package in kernel pciutils xmlsec1-openssl; do
     rpm --quiet -q "${required_package}"
 done
 
+# Phase E: kernel modules are compiled by Universal Blue's server-side akmods
+# images and arrive here as kernel-versioned kmod RPMs. The deployed machine
+# therefore needs neither the matching kernel build tree nor local akmods.
+# Disable autoremove deliberately: ScopeBuddy requires Fedora's full `perl`
+# metapackage, whose CPAN dependency chain in turn retains GCC and Make even
+# though ScopeBuddy itself only runs a few Perl expressions. Removing that
+# broader toolchain would silently remove a retained Bazzite gaming component.
+phase_e_installed=()
+for package in kernel-devel-matched kernel-devel; do
+    if rpm --quiet -q "${package}"; then
+        phase_e_installed+=("${package}")
+    fi
+done
+if ((${#phase_e_installed[@]})); then
+    dnf5 remove --no-autoremove -y "${phase_e_installed[@]}"
+fi
+for package in kernel-devel-matched kernel-devel akmods; do
+    if rpm --quiet -q "${package}"; then
+        printf 'Local kernel build package unexpectedly remains installed: %s\n' \
+            "${package}" >&2
+        exit 1
+    fi
+done
+
+# The kernel and every prebuilt module used by this image must survive the
+# cleanup. ScopeBuddy is retained rather than replacing an upstream RPM with a
+# locally patched, maintenance-heavy copy.
+for required_package in \
+    kernel ScopeBuddy perl \
+    kmod-nvidia kmod-new-lg4ff kmod-gcadapter_oc \
+    kmod-xone kmod-v4l2loopback; do
+    rpm --quiet -q "${required_package}"
+done
+command -v scb >/dev/null
+command -v nvidia-smi >/dev/null
+
 # Trust updates from this repository only when their Sigstore signature matches
 # the public key shipped with the image. The first installation remains an
 # explicit bootstrap decision; subsequent signed deployments use this policy.
