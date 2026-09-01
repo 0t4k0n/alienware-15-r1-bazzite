@@ -41,6 +41,66 @@ done
 # deliberately left in the user's home.
 cp -avf /ctx/system_files/. /
 
+# Phase A: remove complete hardware/application stacks that are unrelated to
+# this machine. Resolve the installed subset at build time so an upstream
+# package rename/removal does not break publication merely because an obsolete
+# name is no longer present.
+readonly -a PHASE_A_REMOVE_PACKAGES=(
+    # Android container and web administration.
+    waydroid waydroid-selinux lxc lxc-libs lxc-templates lxcfs
+    cockpit-bridge cockpit-files cockpit-networkmanager cockpit-podman
+    cockpit-selinux cockpit-storaged cockpit-system
+
+    # Drivers and helpers for hardware not present in the Alienware 15 R1.
+    framework-laptop-kmod-common framework-system fw-ectool fw-fanctrl
+    kmod-framework-laptop
+    hid-fanatecff hid-fanatecff-akmod-modules kmod-hid-fanatecff
+    hid-tmff2 hid-tmff2-akmod-modules kmod-hid-tmff2
+    kvmfr kmod-kvmfr
+    nct6687d kmod-nct6687d
+    new-lg4ff new-lg4ff-akmod-modules kmod-new-lg4ff
+    openrazer-kmod-common kmod-openrazer
+    ryzen_smu ryzen_smu-akmod-modules kmod-ryzen_smu ryzenadj
+    sc0710 kmod-sc0710
+    system76-driver system76-io kmod-system76-driver kmod-system76-io
+    t150-driver kmod-t150-driver
+    zenergy zenergy-akmod-modules kmod-zenergy
+)
+
+phase_a_installed=()
+for package in "${PHASE_A_REMOVE_PACKAGES[@]}"; do
+    if rpm --quiet -q "${package}"; then
+        phase_a_installed+=("${package}")
+    fi
+done
+if ((${#phase_a_installed[@]})); then
+    dnf5 remove -y "${phase_a_installed[@]}"
+fi
+for package in "${PHASE_A_REMOVE_PACKAGES[@]}"; do
+    if rpm --quiet -q "${package}"; then
+        printf 'Phase A package unexpectedly remains installed: %s\n' \
+            "${package}" >&2
+        exit 1
+    fi
+done
+
+# These integrations are copied into Bazzite independently of their RPMs and
+# would otherwise advertise commands or hardware support that no longer exists.
+rm -f \
+    /etc/default/waydroid-launcher \
+    /usr/share/ublue-os/just/82-bazzite-cockpit.just \
+    /usr/share/ublue-os/just/82-bazzite-waydroid.just \
+    /usr/share/ublue-os/udev-rules/50-framework-inputmodule.rules \
+    /usr/share/ublue-os/udev-rules/50-framework16.rules
+
+# Controller support intentionally retained: the GameCube adapter and Wii
+# stack are used on this machine. Xone and v4l2loopback also remain available.
+for required_package in \
+    gcadapter_oc kmod-gcadapter_oc xwiimote-ng \
+    xone-kmod-common kmod-xone v4l2loopback kmod-v4l2loopback; do
+    rpm --quiet -q "${required_package}"
+done
+
 # Trust updates from this repository only when their Sigstore signature matches
 # the public key shipped with the image. The first installation remains an
 # explicit bootstrap decision; subsequent signed deployments use this policy.
