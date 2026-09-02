@@ -11,7 +11,8 @@ readonly VERACRYPT_SHA256="ff6b9b4a84a546c6a6fbc0c58ac1074fc6252cae8398f52b57ff3
 readonly VERACRYPT_KEY_URL="https://amcrypto.jp/VeraCrypt/VeraCrypt_PGP_public_key.asc"
 readonly UPSTREAM_POWEROFF_UNIT=/usr/lib/systemd/system/systemd-poweroff.service
 
-for required_command in blkid btrfs findmnt jq lsblk restorecon swapon; do
+for required_command in \
+    blkid btrfs findmnt journalctl jq lsblk ostree restorecon swapon systemctl; do
     command -v "${required_command}" >/dev/null
 done
 
@@ -40,6 +41,19 @@ done
 # Files that are part of the bootable image. Personal Plasma configuration is
 # deliberately left in the user's home.
 cp -avf /ctx/system_files/. /
+
+# The S4 backend bypasses final.target because its Btrfs swapfile must remain
+# mounted. Require the guarded upstream-finalizer path that preserves staged
+# atomic updates before the graphical session and swap configuration are
+# touched.
+grep -Fq 'ostree admin status --json' \
+    /usr/libexec/alienware-compatible-poweroff
+grep -Fq 'ostree-finalize-staged.service' \
+    /usr/libexec/alienware-compatible-poweroff
+grep -Fq 'bootc-finalize-staged.service' \
+    /usr/libexec/alienware-compatible-poweroff
+grep -Fq '/usr/bin/journalctl --sync' \
+    /usr/libexec/alienware-compatible-poweroff
 
 # Phase A: remove complete hardware/application stacks that are unrelated to
 # this machine. Resolve the installed subset at build time so an upstream

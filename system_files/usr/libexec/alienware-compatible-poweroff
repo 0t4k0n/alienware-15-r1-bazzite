@@ -4,6 +4,8 @@ set -euo pipefail
 readonly SWAPFILE=/var/swap/hibernation.swap
 RESUME_DEVICE=
 RESUME_OFFSET=
+STAGED_COUNT=0
+STAGED_FINALIZER=
 NVIDIA_PREPARED=0
 DISPLAY_STOPPED=0
 PLYMOUTH_STARTED=0
@@ -44,6 +46,74 @@ trap restore_runtime ERR
 
 logger -t alienware-compatible-poweroff 'Avvio spegnimento compatibile tramite ACPI S4'
 
+inspect_staged_deployment() {
+    local status_json
+    local -a active_finalizers=()
+    local finalizer
+
+    status_json="$(ostree admin status --json)"
+    STAGED_COUNT="$(jq -er '[.deployments[] | select(.staged == true)] | length' \
+        <<<"${status_json}")"
+    [[ "${STAGED_COUNT}" =~ ^[0-9]+$ ]] || return 1
+
+    if (( STAGED_COUNT > 1 )); then
+        printf 'Refusing S4: multiple staged OSTree deployments found (%s)\n' \
+            "${STAGED_COUNT}" >&2
+        return 1
+    fi
+
+    if (( STAGED_COUNT == 0 )); then
+        if [[ -e /run/ostree/staged-deployment ]]; then
+            printf 'Refusing S4: stale or inconsistent OSTree staged marker found\n' >&2
+            return 1
+        fi
+        STAGED_FINALIZER=none
+        return 0
+    fi
+
+    if [[ ! -e /run/ostree/staged-deployment ]]; then
+        printf 'Refusing S4: staged deployment has no OSTree runtime marker\n' >&2
+        return 1
+    fi
+
+    for finalizer in \
+        ostree-finalize-staged.service \
+        bootc-finalize-staged.service; do
+        if systemctl is-active --quiet "${finalizer}"; then
+            active_finalizers+=("${finalizer}")
+        fi
+    done
+
+    if (( ${#active_finalizers[@]} != 1 )); then
+        printf 'Refusing S4: expected one active staged finalizer, found %s\n' \
+            "${#active_finalizers[@]}" >&2
+        return 1
+    fi
+    STAGED_FINALIZER="${active_finalizers[0]}"
+}
+
+finalize_staged_deployment() {
+    local remaining_staged
+
+    (( STAGED_COUNT == 1 )) || return 0
+
+    logger -t alienware-compatible-poweroff \
+        "Finalizzazione deployment staged tramite ${STAGED_FINALIZER}"
+    systemctl stop "${STAGED_FINALIZER}"
+
+    remaining_staged="$(ostree admin status --json | \
+        jq -er '[.deployments[] | select(.staged == true)] | length')"
+    if [[ "${remaining_staged}" != 0 || -e /run/ostree/staged-deployment ]]; then
+        logger -t alienware-compatible-poweroff \
+            'Finalizzazione deployment staged non completata; annullo S4'
+        printf 'Refusing S4: staged deployment finalization did not complete\n' >&2
+        return 1
+    fi
+    logger -t alienware-compatible-poweroff 'Deployment staged finalizzato'
+}
+
+inspect_staged_deployment
+
 # Il numero dm-X e l'offset fisico non sono stabili tra installazioni o layout.
 # L'helper li deriva direttamente dallo swapfile Btrfs.
 read -r RESUME_DEVICE RESUME_OFFSET < <(
@@ -61,9 +131,18 @@ fi
 logger -t alienware-compatible-poweroff "Resume dinamico: device=$RESUME_DEVICE offset=$RESUME_OFFSET"
 
 if [[ ${1:-} == --check ]]; then
-    printf 'OK: swapfile=%s device=%s offset=%s\n' "$SWAPFILE" "$RESUME_DEVICE" "$RESUME_OFFSET"
+    printf 'OK: swapfile=%s device=%s offset=%s staged=%s finalizer=%s\n' \
+        "$SWAPFILE" "$RESUME_DEVICE" "$RESUME_OFFSET" \
+        "$STAGED_COUNT" "$STAGED_FINALIZER"
     exit 0
 fi
+
+# The disposable-S4 path deliberately cannot reach final.target/umount.target:
+# the Btrfs swapfile must remain available. Finalize an atomic update through
+# the active upstream service before stopping the graphical session instead.
+finalize_staged_deployment
+/usr/bin/journalctl --sync
+sync
 
 # La procedura gira come servizio di sistema: può quindi terminare la sessione
 # grafica senza interrompere se stessa. Plymouth viene avviato solo dopo che il

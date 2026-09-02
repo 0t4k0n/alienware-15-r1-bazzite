@@ -36,6 +36,12 @@ all follow the same reliable path, while reboot and suspend remain unchanged.
 `noresume` is a deployment kernel-argument requirement rather than an image
 default; the backend checks it before touching the running session and fails
 safely when it is absent.
+Because the Btrfs swapfile must remain mounted, this path cannot traverse
+systemd's normal `final.target`/`umount.target` sequence. Before entering S4 it
+therefore detects any staged atomic update and invokes exactly the active
+OSTree or bootc finalizer through its upstream systemd service. It aborts S4 if
+finalization cannot be confirmed, then flushes the journal and filesystems
+before touching the graphical session.
 
 
 ## Declarative initramfs
