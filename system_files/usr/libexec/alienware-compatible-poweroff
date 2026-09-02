@@ -9,6 +9,7 @@ STAGED_FINALIZER=
 NVIDIA_PREPARED=0
 DISPLAY_STOPPED=0
 PLYMOUTH_STARTED=0
+USERS_STOPPED=0
 
 exec 9>/run/alienware-compatible-poweroff.lock
 flock -n 9 || exit 0
@@ -37,6 +38,12 @@ restore_runtime() {
     if (( PLYMOUTH_STARTED )); then
         /usr/bin/plymouth quit --retain-splash || true
         systemctl stop plymouth-poweroff.service || true
+    fi
+    if (( USERS_STOPPED )); then
+        # The previous graphical session was deliberately terminated and
+        # cannot be reconstructed. Restore the slice so the display manager
+        # can offer a clean login after a failed S4 transition.
+        systemctl start user.slice || true
     fi
     if (( DISPLAY_STOPPED )); then
         systemctl start display-manager.service || true
@@ -149,6 +156,8 @@ sync
 # display manager ha rilasciato la console e la GPU.
 systemctl stop display-manager.service
 DISPLAY_STOPPED=1
+USERS_STOPPED=1
+systemctl stop user.slice
 systemctl start plymouth-poweroff.service
 PLYMOUTH_STARTED=1
 

@@ -41,7 +41,9 @@ systemd's normal `final.target`/`umount.target` sequence. Before entering S4 it
 therefore detects any staged atomic update and invokes exactly the active
 OSTree or bootc finalizer through its upstream systemd service. It aborts S4 if
 finalization cannot be confirmed, then flushes the journal and filesystems
-before touching the graphical session.
+before touching the graphical session. It also stops `user.slice` before S4,
+so lingering user services and command-line applications receive systemd's
+normal ordered termination even when power-off was requested outside Plasma.
 
 
 ## Declarative initramfs
