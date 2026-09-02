@@ -144,22 +144,25 @@ if [[ ${1:-} == --check ]]; then
     exit 0
 fi
 
+# La procedura gira come servizio di sistema: può quindi terminare la sessione
+# grafica senza interrompere se stessa. Plymouth viene avviato non appena il
+# display manager ha rilasciato console e GPU, così copre anche l'eventuale
+# finalizzazione OSTree, che può richiedere diversi secondi.
+systemctl stop display-manager.service
+DISPLAY_STOPPED=1
+systemctl start plymouth-poweroff.service
+PLYMOUTH_STARTED=1
+
 # The disposable-S4 path deliberately cannot reach final.target/umount.target:
 # the Btrfs swapfile must remain available. Finalize an atomic update through
-# the active upstream service before stopping the graphical session instead.
+# the active upstream service while Plymouth is already visible. On failure,
+# restore_runtime returns the machine to a clean login screen.
 finalize_staged_deployment
 /usr/bin/journalctl --sync
 sync
 
-# La procedura gira come servizio di sistema: può quindi terminare la sessione
-# grafica senza interrompere se stessa. Plymouth viene avviato solo dopo che il
-# display manager ha rilasciato la console e la GPU.
-systemctl stop display-manager.service
-DISPLAY_STOPPED=1
 USERS_STOPPED=1
 systemctl stop user.slice
-systemctl start plymouth-poweroff.service
-PLYMOUTH_STARTED=1
 
 # Libera la zram e ricrea la firma dello swapfile, così l'immagine precedente
 # non viene conservata. Al prossimo avvio noresume forza comunque un boot pulito.
