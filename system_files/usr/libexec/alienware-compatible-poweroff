@@ -54,6 +54,7 @@ trap restore_runtime ERR
 logger -t alienware-compatible-poweroff 'Avvio spegnimento compatibile tramite ACPI S4'
 
 inspect_staged_deployment() {
+    local active_state
     local status_json
     local -a active_finalizers=()
     local finalizer
@@ -86,10 +87,29 @@ inspect_staged_deployment() {
     for finalizer in \
         ostree-finalize-staged.service \
         bootc-finalize-staged.service; do
-        if systemctl is-active --quiet "${finalizer}"; then
-            active_finalizers+=("${finalizer}")
-        fi
+        active_state="$(systemctl show --property=ActiveState --value \
+            "${finalizer}")"
+        case "${active_state}" in
+            active|activating|deactivating)
+                active_finalizers+=("${finalizer}")
+                ;;
+        esac
     done
+
+    # A finalizer may complete between the OSTree status read and the systemd
+    # state read. Accept that race only after proving that both the staged
+    # deployment and its runtime marker have disappeared.
+    if (( ${#active_finalizers[@]} == 0 )); then
+        status_json="$(ostree admin status --json)"
+        STAGED_COUNT="$(jq -er \
+            '[.deployments[] | select(.staged == true)] | length' \
+            <<<"${status_json}")"
+        if [[ "${STAGED_COUNT}" == 0 && \
+              ! -e /run/ostree/staged-deployment ]]; then
+            STAGED_FINALIZER=none
+            return 0
+        fi
+    fi
 
     if (( ${#active_finalizers[@]} != 1 )); then
         printf 'Refusing S4: expected one active staged finalizer, found %s\n' \
@@ -150,8 +170,33 @@ fi
 # finalizzazione OSTree, che può richiedere diversi secondi.
 systemctl stop display-manager.service
 DISPLAY_STOPPED=1
+
+# Plasma Login can exit before the user compositor has released DRM/the VT.
+# Wait at most ten seconds; never kill unrelated sessions or block S4 forever
+# for a cosmetic issue. user.slice is still stopped in its normal place below.
+logger -t alienware-compatible-poweroff 'Attesa chiusura KWin prima di Plymouth (massimo 10 secondi)'
+for ((kwin_wait=0; kwin_wait<100; kwin_wait++)); do
+    if ! /usr/bin/pgrep -x kwin_wayland >/dev/null; then
+        break
+    fi
+    sleep 0.1
+done
+if /usr/bin/pgrep -x kwin_wayland >/dev/null; then
+    logger -t alienware-compatible-poweroff 'Timeout attesa KWin: proseguo con Plymouth e S4'
+else
+    logger -t alienware-compatible-poweroff 'KWin terminato: avvio Plymouth'
+fi
+logger -t alienware-compatible-poweroff \
+    "Console prima di Plymouth: $(cat /sys/class/tty/tty0/active 2>/dev/null || true)"
 systemctl start plymouth-poweroff.service
 PLYMOUTH_STARTED=1
+if /usr/bin/plymouth --has-active-vt; then
+    logger -t alienware-compatible-poweroff 'Plymouth dichiara VT attiva'
+else
+    logger -t alienware-compatible-poweroff 'Plymouth non dichiara VT attiva'
+fi
+logger -t alienware-compatible-poweroff \
+    "Console dopo Plymouth: $(cat /sys/class/tty/tty0/active 2>/dev/null || true)"
 
 # The disposable-S4 path deliberately cannot reach final.target/umount.target:
 # the Btrfs swapfile must remain available. Finalize an atomic update through

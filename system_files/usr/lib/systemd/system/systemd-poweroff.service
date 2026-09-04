@@ -2,10 +2,10 @@
 Description=Alienware compatible power off through ACPI S4
 Documentation=man:systemd-poweroff.service(8)
 DefaultDependencies=no
+RequiresMountsFor=/boot /boot/efi /var/swap/hibernation.swap
 After=alienware-hibernation-swap-prepare.service
 
 [Service]
 Type=oneshot
-ExecStartPre=/usr/libexec/alienware-compatible-poweroff --check
 ExecStart=/usr/libexec/alienware-compatible-poweroff
 TimeoutStartSec=infinity

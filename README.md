@@ -40,10 +40,16 @@ Because the Btrfs swapfile must remain mounted, this path cannot traverse
 systemd's normal `final.target`/`umount.target` sequence. Before entering S4 it
 therefore detects any staged atomic update and invokes exactly the active
 OSTree or bootc finalizer through its upstream systemd service. It aborts S4 if
-finalization cannot be confirmed, then flushes the journal and filesystems
-before touching the graphical session. It also stops `user.slice` before S4,
+finalization cannot be confirmed, then flushes the journal and filesystems.
+Plymouth starts after the display manager and compositor have exited, before
+the finalization step. It also stops `user.slice` before S4,
 so lingering user services and command-line applications receive systemd's
 normal ordered termination even when power-off was requested outside Plasma.
+
+A boot-time helper discovers the fsck instances backing the required mounts
+and creates temporary unit copies from the installed systemd template. It
+removes only their conflict with this custom poweroff path; boot-time checks
+and reboot/halt/kexec behavior are preserved without embedding disk UUIDs.
 
 
 ## Declarative initramfs

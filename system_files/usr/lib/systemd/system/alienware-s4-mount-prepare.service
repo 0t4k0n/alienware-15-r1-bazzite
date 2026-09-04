@@ -1,0 +1,13 @@
+[Unit]
+Description=Prepare mount dependencies for Alienware S4 poweroff
+After=local-fs.target
+Before=display-manager.service
+RequiresMountsFor=/boot /boot/efi /var/swap
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/alienware-s4-mount-prepare
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
