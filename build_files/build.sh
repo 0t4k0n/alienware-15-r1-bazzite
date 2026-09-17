@@ -87,7 +87,7 @@ for package in "${PHASE_A_REMOVE_PACKAGES[@]}"; do
     fi
 done
 if ((${#phase_a_installed[@]})); then
-    dnf5 remove -y "${phase_a_installed[@]}"
+    dnf5 remove --no-autoremove -y "${phase_a_installed[@]}"
 fi
 for package in "${PHASE_A_REMOVE_PACKAGES[@]}"; do
     if rpm --quiet -q "${package}"; then
@@ -145,21 +145,10 @@ for removed_path in \
     fi
 done
 
-# Controller support intentionally retained: the GameCube adapter and Wii
-# stack are used on this machine. Xone and v4l2loopback also remain available.
-for required_package in \
-    gcadapter_oc kmod-gcadapter_oc xwiimote-ng \
-    xone-kmod-common kmod-xone v4l2loopback kmod-v4l2loopback \
-    new-lg4ff new-lg4ff-akmod-modules kmod-new-lg4ff oversteer-udev \
-    gmodpatchtool linux-cec inputattach-cec-units; do
-    rpm --quiet -q "${required_package}"
-done
-
-# Phase B: remove optional features that are not used by this installation.
-# Keep Podman and Toolbox (including the persistent alienfx-dev toolbox), but
-# remove the alternative Distrobox frontend. NVIDIA graphics, PRIME and the
-# complete Steam/Proton 32-bit graphics ABI remain intact; only the independent
-# 32-bit CUDA/FBC compute payload is removed.
+# Phase B — unused optional frontends and payloads: remove Tailscale, Distrobox,
+# KRDC, the NVIDIA container toolkit and the independent 32-bit CUDA/FBC
+# payload. Keep Podman and Toolbox (including the persistent alienfx-dev
+# toolbox), NVIDIA graphics, PRIME and the complete Steam/Proton 32-bit ABI.
 readonly -a PHASE_B_REMOVE_PACKAGES=(
     tailscale
     libnvidia-container-tools libnvidia-container1
@@ -176,7 +165,7 @@ for package in "${PHASE_B_REMOVE_PACKAGES[@]}"; do
     fi
 done
 if ((${#phase_b_installed[@]})); then
-    dnf5 remove -y "${phase_b_installed[@]}"
+    dnf5 remove --no-autoremove -y "${phase_b_installed[@]}"
 fi
 for package in "${PHASE_B_REMOVE_PACKAGES[@]}"; do
     if rpm --quiet -q "${package}"; then
@@ -192,25 +181,11 @@ done
 rm -rf /etc/distrobox
 rm -f /usr/share/ublue-os/just/30-distrobox.just
 
-# Fail publication if the cleanup ever expands into retained storage, editor,
-# container or NVIDIA functionality. nvidia-smi belongs to the native
-# nvidia-driver-cuda package, which therefore intentionally remains installed.
-for required_package in \
-    podman toolbox \
-    snapper snapper-libs btrfs-assistant \
-    kate kate-libs kate-plugins \
-    nvidia-driver nvidia-driver-cuda nvidia-driver-cuda-libs.x86_64 \
-    nvidia-driver-libs.x86_64 nvidia-driver-libs.i686; do
-    rpm --quiet -q "${required_package}"
-done
-command -v nvidia-smi >/dev/null
-rpm --quiet -qf "$(command -v nvidia-smi)"
-
-# Phase C: remove complete optional stacks that have no role on this physical,
-# Italian/English workstation. Core IBus remains for ordinary desktop input;
-# only the broad CJK/Thai/Sinhala/Vietnamese engines and the unused Fcitx
-# alternative are removed. OpenCL remains intact for now, including its Intel,
-# Mesa and NVIDIA providers and KInfoCenter integration.
+# Phase C — optional desktop stacks: remove local-VM firmware/guest helpers,
+# Fcitx and non-Latin input engines, unused screen-reader/Braille/speech
+# services and the optional web-app wrapper. Core IBus remains for the normal
+# Plasma input path. OpenCL providers follow the current Bazzite base rather
+# than being pinned by package name in this derivative image.
 readonly -a PHASE_C_REMOVE_PACKAGES=(
     # Firmware/emulation for local VMs, guest operation and cross-architecture
     # containers. None is required to boot this physical x86_64 machine.
@@ -245,7 +220,7 @@ for package in "${PHASE_C_REMOVE_PACKAGES[@]}"; do
     fi
 done
 if ((${#phase_c_installed[@]})); then
-    dnf5 remove -y "${phase_c_installed[@]}"
+    dnf5 remove --no-autoremove -y "${phase_c_installed[@]}"
 fi
 for package in "${PHASE_C_REMOVE_PACKAGES[@]}"; do
     if rpm --quiet -q "${package}"; then
@@ -255,29 +230,10 @@ for package in "${PHASE_C_REMOVE_PACKAGES[@]}"; do
     fi
 done
 
-# Preserve the normal Plasma/input path and the system-information application.
-for required_package in \
-    ibus ibus-libs ibus-gtk3 ibus-gtk4 \
-    breeze-icon-theme oxygen-cursor-themes oxygen-icon-theme oxygen-sounds \
-    plasma-oxygen plasma-oxygen-qt5 plasma-oxygen-qt6 \
-    kinfocenter clinfo opencl-filesystem \
-    intel-opencl intel-opencl-clang mesa-libOpenCL \
-    nvidia-driver-cuda-libs.x86_64 \
-    akonadi-server akonadi-server-mysql mariadb-server \
-    cups cups-client cups-filters cups-filters-driverless \
-    sane-airscan sane-backends \
-    samba samba-client cifs-utils nfs-utils openssh-server \
-    bees f2fs-tools xfsprogs udftools \
-    jupiter-sd-mounting-btrfs steamdeck-kde-presets-desktop \
-    xone-kmod-common kmod-xone v4l2loopback kmod-v4l2loopback; do
-    rpm --quiet -q "${required_package}"
-done
-command -v clinfo >/dev/null
-
-# Phase D: remove self-contained applications and guest integrations that have
-# no role on this physical workstation. Keep shared multimedia/image libraries,
-# pciutils and generic virtualization support: only the explicit leaf stacks
-# are removed here, so an upstream dependency change remains visible to DNF.
+# Phase D — self-contained applications and guest integrations: remove MakeMKV
+# and the Hyper-V, VMware and VirtualBox guest agents. Keep shared multimedia
+# and image libraries, pciutils and generic host virtualization support. Only
+# explicit leaf stacks are removed, so dependency changes remain visible.
 readonly -a PHASE_D_REMOVE_PACKAGES=(
     # Optical-disc ripping application; normal DVD/Blu-ray playback libraries
     # and the rest of the multimedia stack remain available.
@@ -296,7 +252,7 @@ for package in "${PHASE_D_REMOVE_PACKAGES[@]}"; do
     fi
 done
 if ((${#phase_d_installed[@]})); then
-    dnf5 remove -y "${phase_d_installed[@]}"
+    dnf5 remove --no-autoremove -y "${phase_d_installed[@]}"
 fi
 for package in "${PHASE_D_REMOVE_PACKAGES[@]}"; do
     if rpm --quiet -q "${package}"; then
@@ -306,30 +262,11 @@ for package in "${PHASE_D_REMOVE_PACKAGES[@]}"; do
     fi
 done
 
-# Diagnostic, desktop and multimedia facilities are deliberately outside the
-# cleanup and must survive any dependency changes in the base image. Fedora's
-# FFmpeg build requires Tesseract's shared library; removing or orphaning the
-# OCR stack cascades through FFmpeg into Plasma Workspace and is forbidden.
-for required_package in \
-    kernel pciutils xmlsec1-openssl \
-    tesseract-common tesseract-libs tesseract-devel \
-    ffmpeg ffmpeg-libs plasma-desktop plasma-workspace spectacle; do
-    rpm --quiet -q "${required_package}"
-done
-for required_qml_module in \
-    /usr/lib64/qt6/qml/org/kde/plasma/private/keyboardindicator/qmldir \
-    /usr/lib64/qt6/qml/org/kde/breeze/components/qmldir; do
-    test -f "${required_qml_module}"
-    rpm --quiet -qf "${required_qml_module}"
-done
-
-# Phase E: kernel modules are compiled by Universal Blue's server-side akmods
-# images and arrive here as kernel-versioned kmod RPMs. The deployed machine
-# therefore needs neither the matching kernel build tree nor local akmods.
-# Disable autoremove deliberately: ScopeBuddy requires Fedora's full `perl`
-# metapackage, whose CPAN dependency chain in turn retains GCC and Make even
-# though ScopeBuddy itself only runs a few Perl expressions. Removing that
-# broader toolchain would silently remove a retained Bazzite gaming component.
+# Phase E — kernel development trees: kernel modules are compiled by Universal
+# Blue's server-side akmods images and arrive as kernel-versioned kmod RPMs. The
+# deployed machine therefore does not need the matching kernel build tree.
+# Only explicitly named packages are removed; this build does not autoremove
+# other dependencies inherited from Bazzite.
 phase_e_installed=()
 for package in kernel-devel-matched kernel-devel; do
     if rpm --quiet -q "${package}"; then
@@ -339,7 +276,7 @@ done
 if ((${#phase_e_installed[@]})); then
     dnf5 remove --no-autoremove -y "${phase_e_installed[@]}"
 fi
-for package in kernel-devel-matched kernel-devel akmods; do
+for package in kernel-devel-matched kernel-devel; do
     if rpm --quiet -q "${package}"; then
         printf 'Local kernel build package unexpectedly remains installed: %s\n' \
             "${package}" >&2
@@ -347,17 +284,9 @@ for package in kernel-devel-matched kernel-devel akmods; do
     fi
 done
 
-# The kernel and every prebuilt module used by this image must survive the
-# cleanup. ScopeBuddy is retained rather than replacing an upstream RPM with a
-# locally patched, maintenance-heavy copy.
-for required_package in \
-    kernel ScopeBuddy perl \
-    kmod-nvidia kmod-new-lg4ff kmod-gcadapter_oc \
-    kmod-xone kmod-v4l2loopback; do
-    rpm --quiet -q "${required_package}"
-done
-command -v scb >/dev/null
-command -v nvidia-smi >/dev/null
+# The custom S4 backend calls this NVIDIA hibernation hook, so it must remain
+# available even when the inherited Bazzite package set changes.
+test -x /usr/bin/nvidia-sleep.sh
 
 # Trust updates from this repository only when their Sigstore signature matches
 # the public key shipped with the image. The first installation remains an
