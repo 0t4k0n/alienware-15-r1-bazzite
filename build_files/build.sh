@@ -181,6 +181,17 @@ done
 rm -rf /etc/distrobox
 rm -f /usr/share/ublue-os/just/30-distrobox.just
 
+# ujust parses every required import before it runs any recipe. Keep the
+# main justfile in sync with integrations removed from this image.
+for removed_just in \
+    30-distrobox.just \
+    82-bazzite-cockpit.just \
+    82-bazzite-waydroid.just; do
+    sed -i "\|^import \"/usr/share/ublue-os/just/${removed_just}\"$|d" \
+        /usr/share/ublue-os/justfile
+done
+JUST_JUSTFILE=/usr/share/ublue-os/justfile just --list >/dev/null
+
 # Phase C — optional desktop stacks: remove local-VM firmware/guest helpers,
 # Fcitx and non-Latin input engines, unused screen-reader/Braille/speech
 # services and the optional web-app wrapper. Core IBus remains for the normal
