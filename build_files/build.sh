@@ -3,12 +3,6 @@
 set -euo pipefail
 set -x
 
-readonly VERACRYPT_VERSION="1.26.29"
-readonly VERACRYPT_RELEASE="Fedora-44"
-readonly VERACRYPT_RPM="veracrypt-${VERACRYPT_VERSION}-${VERACRYPT_RELEASE}-x86_64.rpm"
-readonly VERACRYPT_URL="https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_${VERACRYPT_VERSION}/${VERACRYPT_RPM}"
-readonly VERACRYPT_SHA256="ff6b9b4a84a546c6a6fbc0c58ac1074fc6252cae8398f52b57ff360a3cbc312e"
-readonly VERACRYPT_KEY_URL="https://amcrypto.jp/VeraCrypt/VeraCrypt_PGP_public_key.asc"
 readonly UPSTREAM_POWEROFF_UNIT=/usr/lib/systemd/system/systemd-poweroff.service
 
 for required_command in \
@@ -337,18 +331,6 @@ if [[ -d /var/lib/nordvpn/data ]]; then
     mkdir -p /usr/share/nordvpn
     mv /var/lib/nordvpn/data /usr/share/nordvpn/data
 fi
-
-# VeraCrypt does not publish a Fedora repository. Pin the official RPM and
-# verify both its digest and embedded RPM signature.
-curl --fail --location --retry 3 \
-    --output "/tmp/${VERACRYPT_RPM}" \
-    "${VERACRYPT_URL}"
-printf '%s  %s\n' "${VERACRYPT_SHA256}" "/tmp/${VERACRYPT_RPM}" | \
-    sha256sum --check --strict
-rpm --import "${VERACRYPT_KEY_URL}"
-rpm --checksig "/tmp/${VERACRYPT_RPM}" | grep -q 'digests signatures OK'
-dnf5 install -y "/tmp/${VERACRYPT_RPM}"
-rm -f "/tmp/${VERACRYPT_RPM}"
 
 # Preserve the service policy already validated on the running machine.
 systemctl enable nordvpnd.service
